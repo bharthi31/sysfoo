@@ -1,7 +1,13 @@
 pipeline {
-  agent any
+  agent none
   stages {
     stage('Build') {
+      agent {
+        docker {
+          image 'maven:3.6.3-jdk-11-slim'
+        }
+
+      }
       steps {
         echo 'Compiling sysfoo'
         sh 'mvn compile'
@@ -9,6 +15,12 @@ pipeline {
     }
 
     stage('test') {
+      agent {
+        docker {
+          image 'maven:3.6.3-jdk-11-slim'
+        }
+
+      }
       steps {
         echo 'Testing sysfoo'
         sh 'mvn clean test'
@@ -16,6 +28,15 @@ pipeline {
     }
 
     stage('package') {
+      when {
+        branch 'master'
+      }
+      agent {
+        docker {
+          image 'maven:3.6.3-jdk-11-slim'
+        }
+
+      }
       steps {
         echo 'Packaging sysfoo'
         sh 'mvn package -DskipTests'
@@ -33,6 +54,27 @@ pipeline {
       steps {
         echo 'Deploying to Dev Environment with Docker Compose'
         sh 'docker-compose up -d'
+      }
+    }
+
+    stage('Docker Build and Publish') {
+      when {
+        branch 'master'
+      }
+      agent any
+      steps {
+        script {
+          docker.withRegistry('https://index.docker.io/v1/', 'dockerlogin') {
+
+            def dockerImage = docker.build("bharthijivi/sysfoo:v${env.BUILD_ID}", "./")
+
+            dockerImage.push()
+
+            dockerImage.push("latest")
+
+          }
+        }
+
       }
     }
 
